@@ -28,6 +28,11 @@ func main() {
 	}
 	end := time.Now().Add(sleep)
 
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGUSR1, syscall.SIGTTIN)
+	// syscall.SIGUSR1: write current info
+	// syscall.SIGTTIN: ignore, we get it on `timer ... &`
+
 	stdin := make(chan struct{}, 1)
 	go func() {
 		for {
@@ -35,11 +40,6 @@ func main() {
 			stdin <- struct{}{}
 		}
 	}()
-
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGUSR1, syscall.SIGTTIN)
-	// syscall.SIGUSR1: write current info
-	// syscall.SIGTTIN: ignore, we get it on `timer ... &`
 	go func() {
 		for {
 			select {
