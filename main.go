@@ -28,15 +28,20 @@ func main() {
 	}
 	end := time.Now().Add(sleep)
 
+	signal.Ignore(syscall.SIGTTIN)
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGUSR1, syscall.SIGTTIN)
+	signal.Notify(sigs, syscall.SIGUSR1)
 	// syscall.SIGUSR1: write current info
-	// syscall.SIGTTIN: ignore, we get it on `timer ... &`
+	// syscall.SIGTTIN: ignore, we would get it on `timer ... &` for the Scanln() over and over again
+	//                  see man 2 read on EIO
 
 	stdin := make(chan struct{}, 1)
 	go func() {
 		for {
-			fmt.Scanln()
+			if _, err := fmt.Scanln(); err != nil {
+				// most likely backgrounded; just give up
+				return
+			}
 			stdin <- struct{}{}
 		}
 	}()
