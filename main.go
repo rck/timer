@@ -13,8 +13,9 @@ import (
 
 func main() {
 	var (
-		flagBell       = flag.Bool("b", false, "Send bell")
-		flagNotifySend = flag.String("n", "", "Send desktop notification with given title (needs 'notify-send')")
+		flagBell        = flag.Bool("b", false, "Send bell")
+		flagNotifySend  = flag.String("n", "", "Send desktop notification with given title (needs 'notify-send')")
+		flagGranularity = flag.Duration("g", 5*time.Second, "Granularity to sleep between checks")
 	)
 	flag.Parse()
 
@@ -45,28 +46,29 @@ func main() {
 			stdin <- struct{}{}
 		}
 	}()
-	go func() {
-		for {
-			select {
-			case sig := <-sigs:
-				if sig == syscall.SIGUSR1 {
-					status := status(end)
-					notifyStderr(status)
-					maybeNotifyDesktop(*flagNotifySend, status)
+
+	ticker := time.Tick(*flagGranularity)
+
+	for {
+		select {
+		case sig := <-sigs:
+			if sig == syscall.SIGUSR1 {
+				status := status(end)
+				notifyStderr(status)
+				maybeNotifyDesktop(*flagNotifySend, status)
+			}
+		case <-stdin:
+			notifyStderr(status(end))
+		case <-ticker:
+			if time.Now().After(end) {
+				if *flagBell {
+					fmt.Print("\a")
 				}
-			case <-stdin:
-				notifyStderr(status(end))
+				maybeNotifyDesktop(*flagNotifySend, fmt.Sprintf("%v", sleep))
+				return
 			}
 		}
-	}()
-
-	// really does not matter, but recalc
-	time.Sleep(end.Sub(time.Now()))
-
-	if *flagBell {
-		fmt.Print("\a")
 	}
-	maybeNotifyDesktop(*flagNotifySend, fmt.Sprintf("%v", sleep))
 }
 
 func status(end time.Time) string {
